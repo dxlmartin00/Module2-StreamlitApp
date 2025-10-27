@@ -118,15 +118,14 @@ st.markdown("""
         50% { transform: scale(1.2); }
     }
 
-    /* Hide the Streamlit toggle button container */
-    .hidden-toggle-container {
-        position: absolute !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
+    /* Hide the tiny column containing the toggle button */
+    [data-testid="column"]:first-child:has(button) {
+        display: none !important;
+        visibility: hidden !important;
         width: 0 !important;
         height: 0 !important;
-        overflow: hidden !important;
-        z-index: -1 !important;
+        position: absolute !important;
+        left: -9999px !important;
     }
 
     /* Floating Chatbot Container */
@@ -468,55 +467,54 @@ try:
     button_emoji = '✕' if st.session_state.chatbot_open else '💬'
     message_count = len(st.session_state.messages)
     show_badge = not st.session_state.chatbot_open and message_count > 0
+    badge_html = f'<div class="chat-badge">{message_count // 2}</div>' if show_badge else ''
 
     button_html = f"""
     <div style="position: fixed; bottom: 24px; right: 24px; z-index: 1001;">
         <div class="floating-chat-button" id="chat-button-widget">
             <span>{button_emoji}</span>
-            {f'<div class="chat-badge">{message_count // 2}</div>' if show_badge else ''}
+            {badge_html}
         </div>
     </div>
     <script>
         // Add click handler to floating button
-        const chatButton = document.getElementById('chat-button-widget');
-        if (chatButton && !chatButton.hasAttribute('data-listener')) {{
-            chatButton.setAttribute('data-listener', 'true');
-            chatButton.addEventListener('click', function() {{
-                // Find and click the hidden Streamlit button
-                const buttons = window.parent.document.querySelectorAll('button');
-                buttons.forEach(btn => {{
-                    if (btn.textContent.includes('Toggle Chat') || btn.getAttribute('kind') === 'secondary') {{
-                        btn.click();
+        (function() {{
+            const chatButton = document.getElementById('chat-button-widget');
+            if (chatButton && !chatButton.hasAttribute('data-listener')) {{
+                chatButton.setAttribute('data-listener', 'true');
+                chatButton.addEventListener('click', function() {{
+                    // Find and click the hidden Streamlit button
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const toggleBtn = buttons.find(btn => btn.innerText === 'Toggle Chat');
+                    if (toggleBtn) {{
+                        toggleBtn.click();
                     }}
                 }});
-            }});
-        }}
+            }}
+        }})();
     </script>
     """
     st.markdown(button_html, unsafe_allow_html=True)
 
-    # Hidden button for toggle functionality (triggered by floating button click)
-    st.markdown('<div class="hidden-toggle-container">', unsafe_allow_html=True)
-    if st.button("Toggle Chat", key="toggle_chat_btn", help="Open/Close AI Assistant"):
-        st.session_state.chatbot_open = not st.session_state.chatbot_open
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Hidden button for toggle functionality - use column to hide it off-screen
+    cols = st.columns([0.001, 99.999])
+    with cols[0]:
+        if st.button("Toggle Chat", key="toggle_chat_btn"):
+            st.session_state.chatbot_open = not st.session_state.chatbot_open
+            st.rerun()
 
     # Render floating chatbot when open
     if st.session_state.chatbot_open:
-        # Inject JavaScript to apply floating-chatbot class to container
-        st.markdown('<div class="floating-chatbot">', unsafe_allow_html=True)
-
-        # Chatbot Header
-        st.markdown("""
+        # Create floating chatbot container with all HTML in one block
+        chatbot_html = """
+        <div class="floating-chatbot">
             <div class="chatbot-header">
                 <div class="chatbot-title">💬 AI Data Assistant</div>
                 <div class="chatbot-subtitle">Ask questions about your customer sentiment and delivery data</div>
             </div>
-        """, unsafe_allow_html=True)
-
-        # Chatbot Content
-        st.markdown('<div class="chatbot-content">', unsafe_allow_html=True)
+            <div class="chatbot-content" style="padding: 16px; background: #f8f9fa; max-height: 520px; overflow-y: auto;">
+        """
+        st.markdown(chatbot_html, unsafe_allow_html=True)
 
         # Close and Clear buttons row
         btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
@@ -550,8 +548,6 @@ try:
                     st.session_state.temp_prompt = suggestion
                     st.rerun()
 
-        st.markdown('</div>', unsafe_allow_html=True)  # Close chatbot-content
-
         # Handle suggested question click
         if "temp_prompt" in st.session_state:
             prompt = st.session_state.temp_prompt
@@ -559,7 +555,8 @@ try:
         else:
             prompt = st.chat_input("Ask me anything about the data...")
 
-        st.markdown('</div>', unsafe_allow_html=True)  # Close floating-chatbot
+        # Close all divs
+        st.markdown('</div></div>', unsafe_allow_html=True)
     else:
         prompt = None
 
