@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import snowflake.connector
-from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -15,18 +14,17 @@ st.set_page_config(
 # Sidebar - Snowflake Connection
 st.sidebar.header("🔐 Snowflake Connection")
 
-# Initialize connection state
 if 'connected' not in st.session_state:
     st.session_state.connected = False
 
 # Connection form
 with st.sidebar.form("connection_form"):
-    account = st.text_input("Account", placeholder="abc12345.us-east-1")
-    user = st.text_input("User", placeholder="your_username")
+    account = st.text_input("Account", value="FUB92942")
+    user = st.text_input("User", value="dxlmartin00")
     password = st.text_input("Password", type="password")
     warehouse = st.text_input("Warehouse", value="COMPUTE_WH")
-    database = st.text_input("Database", placeholder="your_database")
-    schema = st.text_input("Schema", placeholder="your_schema")
+    database = st.text_input("Database", value="AVALANCHE_DB")
+    schema = st.text_input("Schema", value="AVALANCHE_SCHEMA")
     
     connect_button = st.form_submit_button("Connect to Snowflake")
     
@@ -58,7 +56,7 @@ if st.session_state.connected:
         st.session_state.connected = False
         st.rerun()
 
-# Main app - only show if connected
+# Main app
 if st.session_state.connected and 'conn' in st.session_state:
     conn = st.session_state.conn
     
@@ -67,7 +65,7 @@ if st.session_state.connected and 'conn' in st.session_state:
     st.markdown("### Customer Sentiment & Delivery Analysis")
     
     # Load data with caching
-    @st.cache_data(ttl=600)  # Cache for 10 minutes
+    @st.cache_data(ttl=600)
     def load_data(_conn):
         query = """
         SELECT 
@@ -95,13 +93,24 @@ if st.session_state.connected and 'conn' in st.session_state:
     
     try:
         df = load_data(conn)
+        
+        # FIX: Convert data types properly
         df['DATE'] = pd.to_datetime(df['DATE'])
+        df['SENTIMENT_SCORE'] = pd.to_numeric(df['SENTIMENT_SCORE'], errors='coerce')
+        df['DELIVERY_DAYS'] = pd.to_numeric(df['DELIVERY_DAYS'], errors='coerce')
+        
+        # FIX: Convert LATE column to boolean
+        # Handle various possible formats (TRUE/FALSE, True/False, 1/0, true/false)
+        if df['LATE'].dtype == 'object':
+            df['LATE'] = df['LATE'].astype(str).str.upper().isin(['TRUE', '1', 'YES', 'T'])
+        else:
+            df['LATE'] = df['LATE'].astype(bool)
         
         # Filters in sidebar
         st.sidebar.markdown("---")
         st.sidebar.header("📊 Filters")
         
-        products = ['All'] + sorted(df['PRODUCT'].unique().tolist())
+        products = ['All'] + sorted(df['PRODUCT'].dropna().unique().tolist())
         selected_product = st.sidebar.selectbox("Select Product", products)
         
         min_date = df['DATE'].min().date()
@@ -141,14 +150,15 @@ if st.session_state.connected and 'conn' in st.session_state:
             avg_sentiment = filtered_df['SENTIMENT_SCORE'].mean()
             st.metric("Avg Sentiment", f"{avg_sentiment:.3f}")
         with col3:
-            late_count = (filtered_df['LATE'] == True).sum()
-            st.metric("Late Deliveries", f"{late_count}")
+            late_count = filtered_df['LATE'].sum()  # Now works because LATE is boolean
+            st.metric("Late Deliveries", f"{int(late_count)}")
         with col4:
             late_pct = (late_count / len(filtered_df) * 100) if len(filtered_df) > 0 else 0
             st.metric("Late %", f"{late_pct:.1f}%")
         
         # Regional sentiment visualization
         st.subheader("🗺️ Average Sentiment Score by Region")
+        
         regional_sentiment = filtered_df.groupby('REGION').agg({
             'SENTIMENT_SCORE': 'mean',
             'ORDER_ID': 'count'
@@ -187,12 +197,14 @@ if st.session_state.connected and 'conn' in st.session_state:
         negative_regions = regional_sentiment[regional_sentiment['AVG_SENTIMENT'] < 0]
         if len(negative_regions) > 0:
             for _, row in negative_regions.iterrows():
-                st.error(f"**{row['REGION']}**: {row['AVG_SENTIMENT']:.3f} ({row['ORDER_COUNT']} orders)")
+                st.error(f"**{row['REGION']}**: {row['AVG_SENTIMENT']:.3f} ({int(row['ORDER_COUNT'])} orders)")
         else:
             st.success("✅ No regions with negative sentiment!")
         
         # Delivery issues table
         st.subheader("🚨 Delivery Issues Analysis")
+        
+        # FIX: Use proper boolean comparison
         delivery_issues = filtered_df[
             (filtered_df['SENTIMENT_SCORE'] < 0) | (filtered_df['LATE'] == True)
         ].copy()
@@ -201,7 +213,7 @@ if st.session_state.connected and 'conn' in st.session_state:
             issues_summary = delivery_issues.groupby(['REGION', 'PRODUCT']).agg({
                 'ORDER_ID': 'count',
                 'SENTIMENT_SCORE': 'mean',
-                'LATE': lambda x: (x == True).sum()
+                'LATE': 'sum'  # Now sums boolean values correctly
             }).reset_index()
             
             issues_summary.columns = ['REGION', 'PRODUCT', 'TOTAL_ISSUES', 'AVG_SENTIMENT', 'LATE_COUNT']
@@ -223,7 +235,7 @@ if st.session_state.connected and 'conn' in st.session_state:
                         delta=f"{row['LATE_PCT']:.0f}% late",
                         delta_color="inverse"
                     )
-                    st.caption(f"📦 {row['PRODUCT']}: {row['TOTAL_ISSUES']} orders")
+                    st.caption(f"📦 {row['PRODUCT']}: {int(row['TOTAL_ISSUES'])} orders")
         else:
             st.success("✅ No delivery issues found in the filtered data!")
         
@@ -248,13 +260,12 @@ if st.session_state.connected and 'conn' in st.session_state:
                 st.markdown(prompt)
             
             with st.chat_message("assistant"):
-                # Prepare context
                 context = f"""You are analyzing customer review and shipping data for Avalanche products.
 
 Current filtered dataset summary:
 - Total reviews: {len(filtered_df)}
 - Average sentiment: {filtered_df['SENTIMENT_SCORE'].mean():.3f}
-- Late deliveries: {(filtered_df['LATE'] == True).sum()}
+- Late deliveries: {int(filtered_df['LATE'].sum())}
 - Products analyzed: {filtered_df['PRODUCT'].nunique()}
 
 Regional sentiment (top 5):
@@ -264,10 +275,8 @@ User question: {prompt}
 
 Provide a helpful, concise answer based on this data. Include specific numbers and insights."""
                 
-                # Escape single quotes for SQL
                 escaped_context = context.replace("'", "''")
                 
-                # Call Cortex Complete
                 cortex_query = f"""
                 SELECT SNOWFLAKE.CORTEX.COMPLETE(
                     'mistral-large',
@@ -290,9 +299,23 @@ Provide a helpful, concise answer based on this data. Include specific numbers a
     except Exception as e:
         st.error(f"❌ Error loading data: {str(e)}")
         st.info("Please check your table names and permissions.")
+        
+        # Debug info
+        with st.expander("🔍 Debug Information"):
+            st.code(f"""
+Error Details:
+{str(e)}
+
+Expected tables:
+- customer_reviews (columns: product, date, summary, sentiment_score, order_id)
+- shipping_logs (columns: order_id, shipping_date, carrier, delivery_days, late, region, status)
+
+Current database: {database}
+Current schema: {schema}
+            """)
 
 else:
-    # Welcome screen when not connected
+    # Welcome screen
     st.title("🏔️ Avalanche Product Intelligence Dashboard")
     st.markdown("""
     ### Welcome!
