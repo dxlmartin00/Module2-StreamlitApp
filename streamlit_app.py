@@ -230,7 +230,7 @@ try:
     with st.expander("📋 View Filtered Data"):
         st.dataframe(filtered_df, use_container_width=True)
     
-    # AI Chatbot with Streaming Response
+     # AI Chatbot with Streaming Response and Auto-Formatting
     st.divider()
     
     col1, col2 = st.columns([3, 1])
@@ -292,7 +292,7 @@ try:
             thinking_placeholder = st.empty()
             thinking_placeholder.markdown("🤔 *Analyzing data...*")
             
-            # Prepare comprehensive context
+            # Prepare comprehensive context with formatting instructions
             context = f"""You are an intelligent data analyst assistant for Avalanche's product team. 
 
 Current Data Insights:
@@ -316,13 +316,57 @@ Current Data Insights:
 
 User's Question: "{prompt}"
 
-Instructions:
-1. Provide a clear, actionable answer based on the data above
-2. Use specific numbers and percentages
-3. Format with markdown: **bold** key insights, use bullet points for lists
-4. If trends exist, mention specific regions/products
-5. Keep response focused and under 200 words
-6. Be conversational but professional"""
+CRITICAL FORMATTING INSTRUCTIONS - You MUST follow these rules:
+
+1. **For LIST questions** (top, best, worst, which, show me):
+   - Use bullet points with **bold headings**
+   - Format: **Region/Product Name**: Description with numbers
+   - Example:
+     • **Northeast**: Excellent performance with 0.52 sentiment (2.1 days avg delivery, 2% late)
+     • **Southwest**: Needs attention with -0.18 sentiment (5.8 days avg, 28% late)
+
+2. **For COMPARISON questions** (compare, versus, difference):
+   - Use markdown table format
+   - Include key metrics in columns
+   - Example:
+     | Region | Sentiment | Late % | Avg Days |
+     |--------|-----------|--------|----------|
+     | Northeast | 0.52 | 2% | 2.1 |
+     | Southwest | -0.18 | 28% | 5.8 |
+
+3. **For COUNT/NUMBER questions** (how many, total, count):
+   - Start with the direct answer in **bold**
+   - Add 1-2 sentence explanation
+   - Example: **27 late deliveries** out of 100 total orders (27.0%). This represents a significant issue affecting more than a quarter of shipments.
+
+4. **For ANALYSIS questions** (why, explain, what's causing):
+   - Use short paragraphs (2-3 sentences max)
+   - Bold key findings
+   - Include bullet points for supporting evidence
+   - Example structure:
+     The main issue is **late deliveries in Southwest region**. Analysis shows:
+     • 28% late delivery rate (vs 2% in Northeast)
+     • Average 5.8 days delivery time
+     • Negative sentiment correlation of -0.18
+
+5. **For TREND questions** (over time, trending, changes):
+   - Start with summary sentence
+   - Use numbered list for timeline if applicable
+   - Include specific dates and numbers
+
+6. **For RECOMMENDATION questions** (what should we do, suggest, recommend):
+   - Use numbered action items
+   - Format: **1. Action**: Brief explanation with expected impact
+   - Keep it actionable and specific
+
+7. **General formatting rules**:
+   - Always use **bold** for region names, product names, and key metrics
+   - Use numbers with proper formatting (0.52 not .52, 27.0% not 27%)
+   - Add relevant emojis for visual appeal (📊 📈 📉 ⚠️ ✅ ❌)
+   - Keep response under 200 words
+   - Use line breaks between sections for readability
+
+Answer the user's question now, following the appropriate format based on the question type."""
             
             escaped_context = context.replace("'", "''")
             
@@ -352,11 +396,11 @@ Instructions:
                     # Add typing cursor effect
                     message_placeholder.markdown(full_response + "▌")
                     
-                    # Variable speed: faster for common words, slower for numbers
-                    if any(char.isdigit() for char in word):
-                        time.sleep(0.05)  # Slower for numbers
+                    # Variable speed: faster for common words, slower for numbers/formatting
+                    if any(char.isdigit() for char in word) or word in ['|', '**', '-', '•']:
+                        time.sleep(0.04)  # Slower for numbers and formatting
                     else:
-                        time.sleep(0.025)  # Normal speed
+                        time.sleep(0.02)  # Normal speed
                 
                 # Display final response
                 message_placeholder.markdown(full_response.strip())
