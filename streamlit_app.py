@@ -230,37 +230,99 @@ try:
     with st.expander("📋 View Filtered Data"):
         st.dataframe(filtered_df, use_container_width=True)
     
-    # Chatbot
+    # AI Chatbot with Streaming Response
     st.divider()
-    st.subheader("💬 Ask Questions About Your Data")
     
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.subheader("💬 AI Data Assistant")
+    with col2:
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+    
+    st.caption("Ask questions about your customer sentiment and delivery data")
+    
+    # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
     
+    # Display chat history
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
-    if prompt := st.chat_input("Ask about sentiment and delivery data..."):
+    # Suggested questions
+    if len(st.session_state.messages) == 0:
+        st.markdown("**💡 Try asking:**")
+        suggestions = [
+            "Which region has the worst sentiment?",
+            "What's the correlation between delivery days and sentiment?",
+            "Show me the top 3 problem areas",
+            "How many late deliveries do we have?",
+            "Which product has the best reviews?"
+        ]
+        
+        cols = st.columns(len(suggestions))
+        for idx, (col, suggestion) in enumerate(zip(cols, suggestions)):
+            if col.button(f"💭 {idx+1}", key=f"suggest_{idx}", help=suggestion):
+                st.session_state.temp_prompt = suggestion
+                st.rerun()
+    
+    # Handle suggested question click
+    if "temp_prompt" in st.session_state:
+        prompt = st.session_state.temp_prompt
+        del st.session_state.temp_prompt
+    else:
+        prompt = st.chat_input("Ask me anything about the data...")
+    
+    # Process user input
+    if prompt:
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
         
+        # Generate AI response with streaming
         with st.chat_message("assistant"):
-            context = f"""You are analyzing customer review and shipping data for Avalanche products.
+            message_placeholder = st.empty()
+            full_response = ""
+            
+            # Show thinking animation
+            thinking_placeholder = st.empty()
+            thinking_placeholder.markdown("🤔 *Analyzing data...*")
+            
+            # Prepare comprehensive context
+            context = f"""You are an intelligent data analyst assistant for Avalanche's product team. 
 
-Current filtered dataset summary:
-- Total reviews: {len(filtered_df)}
-- Average sentiment: {filtered_df['SENTIMENT_SCORE'].mean():.3f}
-- Late deliveries: {int(filtered_df['LATE'].sum())}
-- Products analyzed: {filtered_df['PRODUCT'].nunique()}
+Current Data Insights:
+━━━━━━━━━━━━━━━━━━
+📊 Overview:
+- Total Reviews: {len(filtered_df)}
+- Average Sentiment: {filtered_df['SENTIMENT_SCORE'].mean():.3f}
+- Sentiment Range: {filtered_df['SENTIMENT_SCORE'].min():.2f} to {filtered_df['SENTIMENT_SCORE'].max():.2f}
+- Late Deliveries: {int(filtered_df['LATE'].sum())} ({late_pct:.1f}%)
+- On-Time Deliveries: {int((~filtered_df['LATE']).sum())}
 
-Regional sentiment (top 5):
-{regional_sentiment.head(5).to_string(index=False)}
+📦 Products: {', '.join(filtered_df['PRODUCT'].unique()[:5].tolist())}
+🗺️ Regions: {', '.join(filtered_df['REGION'].dropna().unique()[:8].tolist())}
+📅 Date Range: {filtered_df['DATE'].min().strftime('%Y-%m-%d')} to {filtered_df['DATE'].max().strftime('%Y-%m-%d')}
 
-User question: {prompt}
+🎯 Regional Performance (sorted by sentiment):
+{regional_sentiment.to_string(index=False, max_rows=10)}
 
-Provide a helpful, concise answer based on this data. Include specific numbers and insights."""
+⚠️ Problem Areas:
+{issues_summary[['REGION', 'PRODUCT', 'TOTAL_ISSUES', 'AVG_SENTIMENT', 'LATE_PCT']].head(5).to_string(index=False) if len(delivery_issues) > 0 else 'No major issues detected'}
+
+User's Question: "{prompt}"
+
+Instructions:
+1. Provide a clear, actionable answer based on the data above
+2. Use specific numbers and percentages
+3. Format with markdown: **bold** key insights, use bullet points for lists
+4. If trends exist, mention specific regions/products
+5. Keep response focused and under 200 words
+6. Be conversational but professional"""
             
             escaped_context = context.replace("'", "''")
             
@@ -276,12 +338,43 @@ Provide a helpful, concise answer based on this data. Include specific numbers a
                 cursor.execute(cortex_query)
                 response = cursor.fetchone()[0]
                 cursor.close()
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+                
+                # Clear thinking indicator
+                thinking_placeholder.empty()
+                
+                # Stream the response word by word
+                import time
+                words = response.split()
+                
+                for i, word in enumerate(words):
+                    full_response += word + " "
+                    
+                    # Add typing cursor effect
+                    message_placeholder.markdown(full_response + "▌")
+                    
+                    # Variable speed: faster for common words, slower for numbers
+                    if any(char.isdigit() for char in word):
+                        time.sleep(0.05)  # Slower for numbers
+                    else:
+                        time.sleep(0.025)  # Normal speed
+                
+                # Display final response
+                message_placeholder.markdown(full_response.strip())
+                
+                # Save to chat history
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": full_response.strip()
+                })
+                
             except Exception as e:
-                error_msg = f"Sorry, I encountered an error: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+                thinking_placeholder.empty()
+                error_msg = f"❌ Sorry, I encountered an error: {str(e)}\n\nPlease try rephrasing your question."
+                message_placeholder.markdown(error_msg)
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": error_msg
+                })
     
 except Exception as e:
     st.error(f"❌ Error loading data: {str(e)}")
