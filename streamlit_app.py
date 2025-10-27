@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="auto"  # Auto-collapse sidebar on mobile
 )
 
-# Mobile-friendly CSS + Floating Chatbot Widget
+# Mobile-friendly CSS
 st.markdown("""
     <style>
     /* Improve mobile readability */
@@ -51,183 +51,6 @@ st.markdown("""
     /* Ensure tables are scrollable on mobile */
     [data-testid="stDataFrame"] {
         overflow-x: auto;
-    }
-
-    /* Hide chatbot sections by default */
-    .chatbot-hidden {
-        display: none !important;
-    }
-
-    /* Floating Chatbot Toggle Button */
-    .floating-chat-button {
-        position: relative;
-        width: 64px;
-        height: 64px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        border: none;
-        animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-        0%, 100% {
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-        }
-        50% {
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6), 0 0 0 10px rgba(102, 126, 234, 0.1);
-        }
-    }
-
-    .floating-chat-button:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 24px rgba(102, 126, 234, 0.6);
-        animation: none;
-    }
-
-    .floating-chat-button span {
-        font-size: 32px;
-    }
-
-    /* Notification badge */
-    .chat-badge {
-        position: absolute;
-        top: -4px;
-        right: -4px;
-        background: #ff4757;
-        color: white;
-        border-radius: 50%;
-        width: 24px;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: bold;
-        border: 3px solid white;
-        animation: bounce 0.5s ease-in-out;
-    }
-
-    @keyframes bounce {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.2); }
-    }
-
-    /* Hide the tiny column containing the toggle button */
-    [data-testid="column"]:first-child:has(button) {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0 !important;
-        height: 0 !important;
-        position: absolute !important;
-        left: -9999px !important;
-    }
-
-    /* Floating Chatbot Container */
-    .floating-chatbot {
-        position: fixed !important;
-        bottom: 100px;
-        right: 24px;
-        width: 420px;
-        max-width: calc(100vw - 48px);
-        max-height: 650px;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-        z-index: 999;
-        overflow: hidden;
-        animation: slideUpFade 0.3s ease-out;
-    }
-
-    @keyframes slideUpFade {
-        from {
-            opacity: 0;
-            transform: translateY(30px) scale(0.95);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-    }
-
-    /* Chatbot Header */
-    .floating-chatbot .chatbot-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 24px;
-        border-radius: 20px 20px 0 0;
-    }
-
-    .floating-chatbot .chatbot-title {
-        font-size: 20px;
-        font-weight: 700;
-        margin: 0 0 4px 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .floating-chatbot .chatbot-subtitle {
-        font-size: 13px;
-        opacity: 0.95;
-        margin: 0;
-        font-weight: 400;
-    }
-
-    /* Chatbot Body */
-    .floating-chatbot .chatbot-content {
-        max-height: 520px;
-        overflow-y: auto;
-        padding: 16px;
-        background: #f8f9fa;
-    }
-
-    /* Style Streamlit elements inside chatbot */
-    .floating-chatbot .stChatMessage {
-        background: white;
-        border-radius: 12px;
-        padding: 12px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    }
-
-    .floating-chatbot .stChatInput {
-        border-radius: 0 0 20px 20px;
-    }
-
-    .floating-chatbot .stButton button {
-        border-radius: 10px;
-        transition: all 0.2s;
-    }
-
-    .floating-chatbot .stButton button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    }
-
-    @media (max-width: 768px) {
-        .floating-chatbot {
-            width: calc(100vw - 32px);
-            right: 16px;
-            bottom: 80px;
-            max-height: calc(100vh - 120px);
-        }
-
-        .floating-chat-button {
-            bottom: 16px;
-            right: 16px;
-            width: 56px;
-            height: 56px;
-        }
-
-        .floating-chat-button span {
-            font-size: 28px;
-        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -457,111 +280,56 @@ try:
     with st.expander("📋 View Filtered Data"):
         st.dataframe(filtered_df, use_container_width=True)
 
-    # Initialize chatbot state
-    if "chatbot_open" not in st.session_state:
-        st.session_state.chatbot_open = False
+    # AI Chatbot with Streaming Response and Auto-Formatting
+    st.divider()
+
+    st.subheader("💬 AI Data Assistant")
+    st.caption("Ask questions about your customer sentiment and delivery data")
+
+    if st.button("🗑️ Clear Chat", use_container_width=False):
+        st.session_state.messages = []
+        st.rerun()
+
+    # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Render the floating chat button using HTML + JavaScript for proper positioning
-    button_emoji = '✕' if st.session_state.chatbot_open else '💬'
-    message_count = len(st.session_state.messages)
-    show_badge = not st.session_state.chatbot_open and message_count > 0
-    badge_html = f'<div class="chat-badge">{message_count // 2}</div>' if show_badge else ''
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    button_html = f"""
-    <div style="position: fixed; bottom: 24px; right: 24px; z-index: 1001;">
-        <div class="floating-chat-button" id="chat-button-widget">
-            <span>{button_emoji}</span>
-            {badge_html}
-        </div>
-    </div>
-    <script>
-        // Add click handler to floating button
-        (function() {{
-            const chatButton = document.getElementById('chat-button-widget');
-            if (chatButton && !chatButton.hasAttribute('data-listener')) {{
-                chatButton.setAttribute('data-listener', 'true');
-                chatButton.addEventListener('click', function() {{
-                    // Find and click the hidden Streamlit button
-                    const buttons = Array.from(document.querySelectorAll('button'));
-                    const toggleBtn = buttons.find(btn => btn.innerText === 'Toggle Chat');
-                    if (toggleBtn) {{
-                        toggleBtn.click();
-                    }}
-                }});
-            }}
-        }})();
-    </script>
-    """
-    st.markdown(button_html, unsafe_allow_html=True)
+    # Suggested questions
+    if len(st.session_state.messages) == 0:
+        st.markdown("**💡 Try asking:**")
+        suggestions = [
+            "Which region has the worst sentiment?",
+            "What's the correlation between delivery days and sentiment?",
+            "Show me the top 3 problem areas",
+            "How many late deliveries do we have?",
+            "Which product has the best reviews?"
+        ]
 
-    # Hidden button for toggle functionality - use column to hide it off-screen
-    cols = st.columns([0.001, 99.999])
-    with cols[0]:
-        if st.button("Toggle Chat", key="toggle_chat_btn"):
-            st.session_state.chatbot_open = not st.session_state.chatbot_open
-            st.rerun()
+        # Display suggestions in 2 columns for better mobile experience
+        for i in range(0, len(suggestions), 2):
+            cols = st.columns(2)
+            for idx, col in enumerate(cols):
+                suggestion_idx = i + idx
+                if suggestion_idx < len(suggestions):
+                    suggestion = suggestions[suggestion_idx]
+                    if col.button(f"💭 {suggestion}", key=f"suggest_{suggestion_idx}", use_container_width=True):
+                        st.session_state.temp_prompt = suggestion
+                        st.rerun()
 
-    # Render floating chatbot when open
-    if st.session_state.chatbot_open:
-        # Create floating chatbot container with all HTML in one block
-        chatbot_html = """
-        <div class="floating-chatbot">
-            <div class="chatbot-header">
-                <div class="chatbot-title">💬 AI Data Assistant</div>
-                <div class="chatbot-subtitle">Ask questions about your customer sentiment and delivery data</div>
-            </div>
-            <div class="chatbot-content" style="padding: 16px; background: #f8f9fa; max-height: 520px; overflow-y: auto;">
-        """
-        st.markdown(chatbot_html, unsafe_allow_html=True)
-
-        # Close and Clear buttons row
-        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 3])
-        with btn_col1:
-            if st.button("✕ Close", key="close_chat", use_container_width=True):
-                st.session_state.chatbot_open = False
-                st.rerun()
-        with btn_col2:
-            if st.button("🗑️ Clear", key="clear_chat", use_container_width=True):
-                st.session_state.messages = []
-                st.rerun()
-
-        # Display chat history
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        # Suggested questions
-        if len(st.session_state.messages) == 0:
-            st.markdown("**💡 Suggested questions:**")
-            suggestions = [
-                "Which region has the worst sentiment?",
-                "Show me the top 3 problem areas",
-                "How many late deliveries do we have?",
-                "Which product has the best reviews?"
-            ]
-
-            # Display suggestions as buttons
-            for i, suggestion in enumerate(suggestions):
-                if st.button(f"💭 {suggestion}", key=f"suggest_{i}", use_container_width=True):
-                    st.session_state.temp_prompt = suggestion
-                    st.rerun()
-
-        # Handle suggested question click
-        if "temp_prompt" in st.session_state:
-            prompt = st.session_state.temp_prompt
-            del st.session_state.temp_prompt
-        else:
-            prompt = st.chat_input("Ask me anything about the data...")
-
-        # Close all divs
-        st.markdown('</div></div>', unsafe_allow_html=True)
+    # Handle suggested question click
+    if "temp_prompt" in st.session_state:
+        prompt = st.session_state.temp_prompt
+        del st.session_state.temp_prompt
     else:
-        prompt = None
+        prompt = st.chat_input("Ask me anything about the data...")
 
     # Process user input
-    if prompt and st.session_state.chatbot_open:
+    if prompt:
         # Add user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
