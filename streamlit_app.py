@@ -8,8 +8,52 @@ import snowflake.connector
 st.set_page_config(
     page_title="Avalanche Product Intelligence",
     page_icon="🏔️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="auto"  # Auto-collapse sidebar on mobile
 )
+
+# Mobile-friendly CSS
+st.markdown("""
+    <style>
+    /* Improve mobile readability */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+            max-width: 100%;
+        }
+
+        /* Make metrics more readable on mobile */
+        [data-testid="stMetricValue"] {
+            font-size: 1.5rem;
+        }
+
+        /* Improve button sizing on mobile */
+        .stButton button {
+            font-size: 0.9rem;
+            padding: 0.5rem 1rem;
+        }
+
+        /* Better spacing for mobile */
+        h1 {
+            font-size: 1.8rem !important;
+        }
+
+        h2 {
+            font-size: 1.4rem !important;
+        }
+
+        h3 {
+            font-size: 1.2rem !important;
+        }
+    }
+
+    /* Ensure tables are scrollable on mobile */
+    [data-testid="stDataFrame"] {
+        overflow-x: auto;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Auto-connect function using secrets
 @st.cache_resource
@@ -130,13 +174,15 @@ try:
     if selected_region != 'All':
         filtered_df = filtered_df[filtered_df['REGION'] == selected_region]
     
-    # Key metrics
-    col1, col2, col3, col4 = st.columns(4)
+    # Key metrics - 2x2 grid for better mobile responsiveness
+    col1, col2 = st.columns(2)
     with col1:
         st.metric("Total Reviews", len(filtered_df))
     with col2:
         avg_sentiment = filtered_df['SENTIMENT_SCORE'].mean()
         st.metric("Avg Sentiment", f"{avg_sentiment:.3f}")
+
+    col3, col4 = st.columns(2)
     with col3:
         late_count = filtered_df['LATE'].sum()
         st.metric("Late Deliveries", f"{int(late_count)}")
@@ -175,7 +221,8 @@ try:
     fig.update_layout(
         xaxis_title='Average Sentiment Score',
         yaxis_title='Region',
-        height=400
+        height=max(300, min(600, len(regional_sentiment) * 50)),  # Dynamic height based on data
+        margin=dict(l=20, r=20, t=20, b=20)  # Smaller margins for mobile
     )
     fig.add_vline(x=0, line_dash="dash", line_color="gray", opacity=0.5)
     st.plotly_chart(fig, use_container_width=True)
@@ -212,17 +259,20 @@ try:
         # Top 3 problem areas
         st.markdown("### 🔴 Top 3 Problem Areas")
         top_issues = issues_summary.head(3)
-        
-        cols = st.columns(min(3, len(top_issues)))
-        for idx, (col, (_, row)) in enumerate(zip(cols, top_issues.iterrows())):
-            with col:
+
+        # Stack vertically for better mobile readability
+        for idx, (_, row) in enumerate(top_issues.iterrows()):
+            col1, col2 = st.columns([2, 1])
+            with col1:
                 st.metric(
                     label=f"#{idx+1}: {row['REGION']}",
                     value=f"{row['AVG_SENTIMENT']:.2f}",
                     delta=f"{row['LATE_PCT']:.0f}% late",
                     delta_color="inverse"
                 )
-                st.caption(f"📦 {row['PRODUCT']}: {int(row['TOTAL_ISSUES'])} orders")
+            with col2:
+                st.caption(f"📦 {row['PRODUCT']}")
+                st.caption(f"🔢 {int(row['TOTAL_ISSUES'])} orders")
     else:
         st.success("✅ No delivery issues found in the filtered data!")
     
@@ -232,16 +282,13 @@ try:
     
      # AI Chatbot with Streaming Response and Auto-Formatting
     st.divider()
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.subheader("💬 AI Data Assistant")
-    with col2:
-        if st.button("🗑️ Clear Chat"):
-            st.session_state.messages = []
-            st.rerun()
-    
+
+    st.subheader("💬 AI Data Assistant")
     st.caption("Ask questions about your customer sentiment and delivery data")
+
+    if st.button("🗑️ Clear Chat", use_container_width=False):
+        st.session_state.messages = []
+        st.rerun()
     
     # Initialize chat history
     if "messages" not in st.session_state:
@@ -262,12 +309,17 @@ try:
             "How many late deliveries do we have?",
             "Which product has the best reviews?"
         ]
-        
-        cols = st.columns(len(suggestions))
-        for idx, (col, suggestion) in enumerate(zip(cols, suggestions)):
-            if col.button(f"💭 {idx+1}", key=f"suggest_{idx}", help=suggestion):
-                st.session_state.temp_prompt = suggestion
-                st.rerun()
+
+        # Display suggestions in 2 columns for better mobile experience
+        for i in range(0, len(suggestions), 2):
+            cols = st.columns(2)
+            for idx, col in enumerate(cols):
+                suggestion_idx = i + idx
+                if suggestion_idx < len(suggestions):
+                    suggestion = suggestions[suggestion_idx]
+                    if col.button(f"💭 {suggestion}", key=f"suggest_{suggestion_idx}", use_container_width=True):
+                        st.session_state.temp_prompt = suggestion
+                        st.rerun()
     
     # Handle suggested question click
     if "temp_prompt" in st.session_state:
