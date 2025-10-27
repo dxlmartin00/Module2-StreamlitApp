@@ -118,9 +118,15 @@ st.markdown("""
         50% { transform: scale(1.2); }
     }
 
-    /* Hide the Streamlit toggle button */
-    [data-testid="column"]:has(button[key="toggle_chat_btn"]) {
-        display: none !important;
+    /* Hide the Streamlit toggle button container */
+    .hidden-toggle-container {
+        position: absolute !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        z-index: -1 !important;
     }
 
     /* Floating Chatbot Container */
@@ -464,34 +470,37 @@ try:
     show_badge = not st.session_state.chatbot_open and message_count > 0
 
     button_html = f"""
-        <div style="position: fixed; bottom: 24px; right: 24px; z-index: 1001;">
-            <button
-                class="floating-chat-button"
-                style="all: unset; cursor: pointer;"
-                onclick="document.getElementById('toggle_chat_btn').click()">
-                <span>{button_emoji}</span>
-                {f'<div class="chat-badge">{message_count // 2}</div>' if show_badge else ''}
-            </button>
+    <div style="position: fixed; bottom: 24px; right: 24px; z-index: 1001;">
+        <div class="floating-chat-button" id="chat-button-widget">
+            <span>{button_emoji}</span>
+            {f'<div class="chat-badge">{message_count // 2}</div>' if show_badge else ''}
         </div>
-        <script>
-            // Smooth scroll animations
-            window.addEventListener('load', function() {{
-                const chatButton = document.querySelector('.floating-chat-button');
-                if (chatButton) {{
-                    chatButton.style.animation = 'none';
-                    setTimeout(() => chatButton.style.animation = '', 10);
-                }}
+    </div>
+    <script>
+        // Add click handler to floating button
+        const chatButton = document.getElementById('chat-button-widget');
+        if (chatButton && !chatButton.hasAttribute('data-listener')) {{
+            chatButton.setAttribute('data-listener', 'true');
+            chatButton.addEventListener('click', function() {{
+                // Find and click the hidden Streamlit button
+                const buttons = window.parent.document.querySelectorAll('button');
+                buttons.forEach(btn => {{
+                    if (btn.textContent.includes('Toggle Chat') || btn.getAttribute('kind') === 'secondary') {{
+                        btn.click();
+                    }}
+                }});
             }});
-        </script>
+        }}
+    </script>
     """
     st.markdown(button_html, unsafe_allow_html=True)
 
     # Hidden button for toggle functionality (triggered by floating button click)
-    col1, col2 = st.columns([10, 1])
-    with col2:
-        if st.button("", key="toggle_chat_btn", help="Toggle Chat", type="secondary"):
-            st.session_state.chatbot_open = not st.session_state.chatbot_open
-            st.rerun()
+    st.markdown('<div class="hidden-toggle-container">', unsafe_allow_html=True)
+    if st.button("Toggle Chat", key="toggle_chat_btn", help="Open/Close AI Assistant"):
+        st.session_state.chatbot_open = not st.session_state.chatbot_open
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Render floating chatbot when open
     if st.session_state.chatbot_open:
